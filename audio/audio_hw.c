@@ -35,6 +35,8 @@
 #include <math.h>
 #include <dlfcn.h>
 
+#include <unistd.h>
+
 #include <cutils/log.h>
 #include <cutils/str_parms.h>
 #include <cutils/atomic.h>
