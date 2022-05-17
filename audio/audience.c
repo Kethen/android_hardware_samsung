@@ -24,6 +24,8 @@
 #include <cutils/log.h>
 #include <audience-routes.h>
 
+#include <unistd.h>
+
 #include "audience.h"
 
 /*
