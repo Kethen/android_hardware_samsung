@@ -286,38 +286,115 @@ IBiometricsFingerprint* BiometricsFingerprint::getInstance() {
     return sInstance;
 }
 
+void logDlsymError(const char* symbolName) {
+    const char* error_str = dlerror();
+    if (error_str != nullptr){
+        LOG(ERROR) << "Cannot load " << symbolName << " from libbauthserver.so, error: " << error_str;
+    }else{
+        LOG(ERROR) << "Cannot load " << symbolName << " from libbauthserver.so, symbol is null ";
+    }
+}
+
 bool BiometricsFingerprint::openHal() {
     void* handle = dlopen("libbauthserver.so", RTLD_NOW);
     if (handle) {
         int err;
+        bool errored = false;
 
         ss_fingerprint_close =
             reinterpret_cast<typeof(ss_fingerprint_close)>(dlsym(handle, "ss_fingerprint_close"));
+        if (ss_fingerprint_close == nullptr){
+            errored = true;
+            logDlsymError("ss_fingerprint_close");
+        }
+
         ss_fingerprint_open =
             reinterpret_cast<typeof(ss_fingerprint_open)>(dlsym(handle, "ss_fingerprint_open"));
+        if (ss_fingerprint_open == nullptr){
+            errored = true;
+            logDlsymError("ss_fingerprint_open");
+        }
 
         ss_set_notify_callback = reinterpret_cast<typeof(ss_set_notify_callback)>(
             dlsym(handle, "ss_set_notify_callback"));
+        if (ss_set_notify_callback == nullptr){
+            errored = true;
+            logDlsymError("ss_set_notify_callback");
+        }
+
         ss_fingerprint_pre_enroll = reinterpret_cast<typeof(ss_fingerprint_pre_enroll)>(
             dlsym(handle, "ss_fingerprint_pre_enroll"));
+        if (ss_fingerprint_pre_enroll == nullptr){
+            errored = true;
+            logDlsymError("ss_fingerprint_pre_enroll");
+        }
+
         ss_fingerprint_enroll =
             reinterpret_cast<typeof(ss_fingerprint_enroll)>(dlsym(handle, "ss_fingerprint_enroll"));
+        if (ss_fingerprint_enroll == nullptr){
+            errored = true;
+            logDlsymError("ss_fingerprint_enroll");
+        }
+
         ss_fingerprint_post_enroll = reinterpret_cast<typeof(ss_fingerprint_post_enroll)>(
             dlsym(handle, "ss_fingerprint_post_enroll"));
+        if (ss_fingerprint_post_enroll == nullptr){
+            errored = true;
+            logDlsymError("ss_fingerprint_post_enroll");
+        }
+
         ss_fingerprint_get_auth_id = reinterpret_cast<typeof(ss_fingerprint_get_auth_id)>(
             dlsym(handle, "ss_fingerprint_get_auth_id"));
+        if (ss_fingerprint_get_auth_id == nullptr){
+            errored = true;
+            logDlsymError("ss_fingerprint_get_auth_id");
+        }
+
         ss_fingerprint_cancel =
             reinterpret_cast<typeof(ss_fingerprint_cancel)>(dlsym(handle, "ss_fingerprint_cancel"));
+        if (ss_fingerprint_cancel == nullptr){
+            errored = true;
+            logDlsymError("ss_fingerprint_cancel");
+        }
+
         ss_fingerprint_enumerate = reinterpret_cast<typeof(ss_fingerprint_enumerate)>(
             dlsym(handle, "ss_fingerprint_enumerate"));
+        if (ss_fingerprint_enumerate == nullptr){
+            errored = true;
+            logDlsymError("ss_fingerprint_enumerate");
+        }
+
         ss_fingerprint_remove =
             reinterpret_cast<typeof(ss_fingerprint_remove)>(dlsym(handle, "ss_fingerprint_remove"));
+        if (ss_fingerprint_remove == nullptr){
+            errored = true;
+            logDlsymError("ss_fingerprint_remove");
+        }
+
         ss_fingerprint_set_active_group = reinterpret_cast<typeof(ss_fingerprint_set_active_group)>(
             dlsym(handle, "ss_fingerprint_set_active_group"));
+        if (ss_fingerprint_set_active_group == nullptr){
+            errored = true;
+            logDlsymError("ss_fingerprint_set_active_group");
+        }
+
         ss_fingerprint_authenticate = reinterpret_cast<typeof(ss_fingerprint_authenticate)>(
             dlsym(handle, "ss_fingerprint_authenticate"));
+        if (ss_fingerprint_authenticate == nullptr){
+            errored = true;
+            logDlsymError("ss_fingerprint_authenticate");
+        }
+
         ss_fingerprint_request = reinterpret_cast<typeof(ss_fingerprint_request)>(
             dlsym(handle, "ss_fingerprint_request"));
+        if (ss_fingerprint_request == nullptr){
+            errored = true;
+            logDlsymError("ss_fingerprint_request");
+        }
+
+        if (errored) {
+            return false;
+        }
 
         if ((err = ss_fingerprint_open(nullptr)) != 0) {
             LOG(ERROR) << "Can't open fingerprint, error: " << err;
@@ -332,6 +409,7 @@ bool BiometricsFingerprint::openHal() {
         return true;
     }
 
+    LOG(ERROR) << "Can't open libbauthserver.so, error: " << dlerror();
     return false;
 }
 
