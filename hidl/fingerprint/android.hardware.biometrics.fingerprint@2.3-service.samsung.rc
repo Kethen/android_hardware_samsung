@@ -5,3 +5,13 @@ service vendor.fps_hal /vendor/bin/hw/android.hardware.biometrics.fingerprint@2.
     class late_start
     user system
     group system input uhid
+
+on early-boot
+    exec_start relocate_biometrics
+
+service relocate_biometrics /vendor/bin/relocate_biometrics
+    disabled
+    oneshot
+    user root
+    group root
+    seclabel u:r:su:s0
