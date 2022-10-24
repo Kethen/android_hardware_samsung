@@ -1054,6 +1054,14 @@ int SetLoopbackTest(HRilClient client, LoopbackMode mode, AudioPath path) {
     return ret;
 }
 
+/**
+ * dummy SetAudioMode for linking
+ */
+extern "C"
+int SetAudioMode(HRilClient client, char unknown, int mode){
+	RLOGV("dummy SetAudioMode invoked with %p, %d, %d", client, unknown, mode);
+	return 0;
+}
 
 /**
  * @fn  int InvokeOemRequestHookRaw(HRilClient client, char *data, size_t len)

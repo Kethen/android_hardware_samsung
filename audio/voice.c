@@ -74,6 +74,12 @@ struct pcm_config pcm_config_voice_sco_wb = {
 int start_voice_call(struct audio_device *adev);
 int stop_voice_call(struct audio_device *adev);
 
+void set_voice_session_audio_mode(struct voice_session *session, int mode){
+    ALOGV("%s: ril_set_call_audio_mode(%d)", __func__, mode);
+    int rc = ril_set_call_audio_mode(&session->ril, 0, mode);
+    ALOGE_IF(rc != 0, "Failed to set audio mode: (%d)", rc);
+}
+
 void set_voice_session_audio_path(struct voice_session *session)
 {
     enum _AudioPath device_type;

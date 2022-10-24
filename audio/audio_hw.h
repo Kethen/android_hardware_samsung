@@ -21,6 +21,9 @@
 
 #include <cutils/list.h>
 #include <hardware/audio.h>
+#ifdef PREPROCESSING_ENABLED
+#include <hardware/audio_effect.h>
+#endif
 #include <hardware/audio_amplifier.h>
 
 #include <tinyalsa/asoundlib.h>
@@ -405,6 +408,14 @@ struct audio_device {
     // stream mutex locked: the stream will load it atomically with a barrier and re-read it
     // with audio device mutex if needed
     volatile int32_t        echo_reference_generation;
+
+    // hacking in AEC, AGC and NS for ut, directly loading them from libLifevibes_lvvetx.so
+    #ifndef __LP64__
+    struct audio_effect_library_s *lifevibes;
+    effect_handle_t agc;
+    effect_handle_t aec;
+    effect_handle_t ns;
+    #endif
 #endif
 
     pthread_mutex_t         lock_inputs; /* see note below on mutex acquisition order */

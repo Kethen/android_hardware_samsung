@@ -200,6 +200,27 @@ int ril_set_call_volume(struct ril_handle *ril,
     return rc;
 }
 
+int ril_set_call_audio_mode(struct ril_handle *ril,
+                        char unknown,
+                        int mode)
+{
+    int rc;
+
+    rc = ril_connect_if_required(ril);
+    if (rc != 0) {
+        ALOGE("%s: Failed to connect to RIL (%s)", __func__, strerror(rc));
+        return 0;
+    }
+
+    rc = SetAudioMode(ril->client, unknown, mode);
+
+    if (rc != 0) {
+        ALOGE("%s: SetAudioMode() failed, rc=%d", __func__, rc);
+    }
+
+    return rc;
+}
+
 int ril_set_call_audio_path(struct ril_handle *ril, enum _AudioPath path)
 {
     int rc;

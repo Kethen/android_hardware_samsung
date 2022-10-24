@@ -289,6 +289,11 @@ int SetDhaSolution(HRilClient client, DhaSolMode mode, DhaSolSelect select, char
  */
 int SetLoopbackTest(HRilClient client, LoopbackMode mode, AudioPath path);
 
+/**
+ * dummy SetAudioMode for linking
+ */
+int SetAudioMode(HRilClient client, char unknown, int mode);
+
 #ifdef __cplusplus
 };
 #endif

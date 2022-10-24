@@ -2848,6 +2848,8 @@ static ssize_t out_write(struct audio_stream_out *stream, const void *buffer,
     struct stream_in *in = NULL;
 #endif
 
+    ALOGVV("%s: enter", __func__);
+
     lock_output_stream(out);
 
 #if SUPPORTS_IRQ_AFFINITY
@@ -3377,6 +3379,8 @@ static ssize_t in_read(struct audio_stream_in *stream, void *buffer,
     int read_and_process_successful = false;
 
     size_t frames_rq = bytes / audio_stream_in_frame_size(stream);
+
+    ALOGVV("%s: enter", __func__);
 
     /* no need to acquire adev->lock_inputs because API contract prevents a close */
     lock_input_stream(in);
@@ -3985,6 +3989,8 @@ static int adev_set_mode(struct audio_hw_device *dev, audio_mode_t mode)
         if ((mode == AUDIO_MODE_NORMAL) && adev->voice.in_call) {
             stop_voice_call(adev);
         }
+
+        set_voice_session_audio_mode(adev->voice.session, mode);
     }
     pthread_mutex_unlock(&adev->lock);
     return 0;
@@ -4029,6 +4035,39 @@ static size_t adev_get_input_buffer_size(const struct audio_hw_device *dev,
                                  PCM_CAPTURE /* usecase_type */,
                                  AUDIO_DEVICE_IN_BUILTIN_MIC);
 }
+
+#ifdef PREPROCESSING_ENABLED
+#ifndef __LP64__
+// ut hack, adding effect onto input
+// placeholder currently, does not seem to work well with pulse
+static void ut_insert_audio_effect(const struct stream_in *stream){
+    if(stream != NULL){
+        if(stream->source == AUDIO_SOURCE_VOICE_COMMUNICATION || stream->source == AUDIO_SOURCE_MIC){
+            if(stream->num_preprocessors == 0){
+                if(adev->agc != NULL){
+                    ALOGI("ut audio hack: adding agc to input stream");
+                    if(in_add_audio_effect((struct audio_stream *)stream, adev->agc)){
+                        ALOGE("ut audio hack: failed adding aec to input stream");
+                    }
+                }
+                if(adev->ns != NULL){
+                    ALOGI("ut audio hack: adding ns to input stream");
+                    if(in_add_audio_effect((struct audio_stream *)stream, adev->ns)){
+                        ALOGE("ut audio hack: failed adding ns to input stream");
+                    }
+                }
+                if(adev->aec != NULL){
+                    ALOGI("ut audio hack: adding aec to input stream");
+                    if(in_add_audio_effect((struct audio_stream *)stream, adev->aec)){
+                        ALOGE("ut audio hack: failed adding aec to input stream");
+                    }
+                }
+            }
+        }
+    }
+}
+#endif //not __LP64__
+#endif //PREPROCESSING_ENABLED
 
 static int adev_open_input_stream(struct audio_hw_device *dev,
                                   audio_io_handle_t handle __unused,
@@ -4110,6 +4149,13 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
     in->is_fastcapture_affinity_set = false;
 
     *stream_in = &in->stream;
+
+#ifdef PREPROCESSING_ENABLED
+#ifndef __LP64__
+	ut_insert_audio_effect(in);
+#endif //not __LP64__
+#endif //PREPROCESSING_ENABLED
+
     ALOGV("%s: exit", __func__);
     return 0;
 }
@@ -4187,6 +4233,23 @@ static int adev_close(hw_device_t *device)
     free(adev->snd_dev_ref_cnt);
     free_mixer_list(adev);
     free(device);
+
+#ifndef __LP64__
+#ifdef PREPROCESSING_ENABLED
+    // release effects as part of the hack for ut
+    if(adev->lifevibes != NULL){
+        if(adev->agc != NULL){
+            adev->lifevibes->release_effect(adev->agc);
+        }
+        if(adev->aec != NULL){
+            adev->lifevibes->release_effect(adev->aec);
+        }
+        if(adev->ns != NULL){
+            adev->lifevibes->release_effect(adev->ns);
+        }
+    }
+#endif //PREPROCESSING_ENABLED
+#endif //not __LP64__
 
     adev = NULL;
 
@@ -4326,6 +4389,46 @@ static int adev_open(const hw_module_t *module, const char *name,
             pcm_device_capture_low_latency.config.period_size = trial;
         }
     }
+
+#ifndef __LP64__
+#ifdef PREPROCESSING_ENABLED
+    // ut lifevibes hacks init
+    adev->lifevibes = NULL;
+    adev->agc = NULL;
+    adev->aec = NULL;
+    adev->ns = NULL;
+    int lifevibes_hack = property_get_int32("8890.lifevibes_hack", 0);
+    if(lifevibes_hack){
+        void *handle = dlopen("/vendor/lib/soundfx/libLifevibes_lvvetx.so", RTLD_NOW);
+        if(handle == NULL){
+            ALOGE("ut audio hack: cannot dlopen /vendor/lib/soundfx/libLifevibes_lvvetx.so: %s", dlerror());
+        }else{
+            void *effect_library = dlsym(handle, AUDIO_EFFECT_LIBRARY_INFO_SYM_AS_STR);
+            if(effect_library == NULL){
+                ALOGE("ut audio hack: cannot dlsym %s: %s", AUDIO_EFFECT_LIBRARY_INFO_SYM_AS_STR, dlerror());
+            }else{
+                adev->lifevibes = effect_library;
+                // create a single set of effects just for voice calls
+                static const effect_uuid_t agc_uuid = { 0x3b75f00, 0x93ce, 0x11e0, 0x9fb8, { 0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b } };
+                static const effect_uuid_t aec_uuid = { 0xd6dbf400, 0x93ce, 0x11e0, 0xbcd7, { 0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b } };
+                static const effect_uuid_t ns_uuid = { 0xdf0afc20, 0x93ce, 0x11e0, 0x98de, { 0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b } };
+                if(adev->lifevibes->create_effect(&agc_uuid, 1, 1, &(adev->agc))){
+                    ALOGE("ut audio hack: failed creating agc effect");
+                    adev->agc = NULL;
+                }
+                if(adev->lifevibes->create_effect(&aec_uuid, 1, 1, &(adev->aec))){
+                    ALOGE("ut audio hack: failed creating aec effect");
+                    adev->aec = NULL;
+                }
+                if(adev->lifevibes->create_effect(&ns_uuid, 1, 1, &(adev->ns))){
+                    ALOGE("ut audio hack: failed creating aec effect");
+                    adev->ns = NULL;
+                }
+            }
+        }
+    }
+#endif //PREPROCESSING_ENABLED
+#endif //not __LP64__
 
     ALOGV("%s: exit", __func__);
     return 0;
